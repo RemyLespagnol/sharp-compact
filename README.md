@@ -10,7 +10,9 @@ Before each compaction (`/compact`, auto-compact, or one started by a plugin):
 
 1. It asks your session for a handoff brief. The brief is written by the session's own model over its own transcript, using `$.model.fork`, so the cached prefix is reused.
 2. It gives that brief to the summarizer as instructions. Your own `/compact <text>` stays first, as your priority.
-3. It keeps the brief word for word in the compacted conversation, so exact details survive even if the summary paraphrases them.
+3. It adds the brief word for word to the compacted conversation as a hidden note (the model reads it, your transcript doesn't show it), so exact details survive even if the summary paraphrases them.
+
+Short conversations (under ~5k tokens of messages) compact normally: the summary alone keeps everything. The brief's length follows the work done, and it leaves out what reloads anyway (CLAUDE.md, memory, skills).
 
 If anything goes wrong (no conversation to fork yet, an API error, an empty reply, or a timeout), the compaction runs as it normally would and a toast says why.
 
