@@ -8,12 +8,16 @@ const compaction = { trigger: 'manual' as const, instructions: 'focus auth', mes
 
 function core(on: On) {
   const seen: (string | undefined)[] = []
-  on('ui.toast', () => ({ value: undefined }))
+  const toasts: string[] = []
+  on('ui.toast', ($, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
   on('session.compact', ($, e) => {
     seen.push(e.instructions)
     return { messages: [{ role: 'assistant', text: 'SUMMARY', toolUses: [] }] }
   })
-  return { seen, clock: mock.clock(on), session: mock.session(on) }
+  return { seen, toasts, clock: mock.clock(on), session: mock.session(on) }
 }
 
 function texts(r: SessionCompactResult): string[] {
@@ -22,9 +26,10 @@ function texts(r: SessionCompactResult): string[] {
 
 test('steers summarizer with brief', async ($, on) => {
   on('model.fork', () => ({ value: { isAnswered: true, text: 'BRIEF', usage } }))
-  const { seen, clock, session } = core(on)
+  const { seen, toasts, clock, session } = core(on)
   const r = await $.session.compact(compaction)
   await clock.settle()
+  expect(toasts[toasts.length - 1]).toBe('sharp-compact: brief kept (1 word)')
   expect(seen).toEqual([buildInstructions('focus auth', 'BRIEF')])
   expect(texts(r)).toEqual(['SUMMARY'])
   expect(session.appended().map(a => a.message)).toEqual([expect.objectContaining(briefNote('BRIEF'))])
@@ -36,9 +41,10 @@ test('skips a short conversation without forking', async ($, on) => {
     forked = true
     return { value: { isAnswered: true, text: 'BRIEF', usage } }
   })
-  const { seen } = core(on)
+  const { seen, toasts } = core(on)
   await $.session.compact({ ...compaction, messages: [{ role: 'user', text: 'hi', toolUses: [] }] })
   expect(forked).toBe(false)
+  expect(toasts).toEqual(['sharp-compact: short conversation, normal compaction'])
   expect(seen).toEqual(['focus auth'])
 })
 

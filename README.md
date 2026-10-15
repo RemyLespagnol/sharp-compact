@@ -14,7 +14,7 @@ Before each compaction (`/compact`, auto-compact, or one started by a plugin):
 
 Short conversations (under ~5k tokens of messages) compact normally: the summary alone keeps everything. The brief's length follows the work done, and it leaves out what reloads anyway (CLAUDE.md, memory, skills).
 
-If anything goes wrong (no conversation to fork yet, an API error, an empty reply, or a timeout), the compaction runs as it normally would and a toast says why.
+A toast tells you what happened: `brief kept (N words)`, `short conversation, normal compaction`, or, if anything goes wrong (no conversation to fork yet, an API error, an empty reply, a timeout), `brief skipped (<reason>)`, in which case the compaction runs as it normally would.
 
 ### Before / after
 
