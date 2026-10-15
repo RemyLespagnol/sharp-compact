@@ -1,9 +1,10 @@
 import { test, expect, mock } from 'claude-code/testing'
 import type { On, SessionCompactResult } from 'claude-code'
-import { briefMessage, buildInstructions, isHandled } from '../hooks/brief'
+import { briefNote, buildInstructions, isHandled } from '../hooks/brief'
 
 const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 }
-const compaction = { trigger: 'manual' as const, instructions: 'focus auth', messages: [{ role: 'user' as const, text: 'hi', toolUses: [] }] }
+const long = 'x'.repeat(20_000)
+const compaction = { trigger: 'manual' as const, instructions: 'focus auth', messages: [{ role: 'user' as const, text: long, toolUses: [] }] }
 
 function core(on: On) {
   const seen: (string | undefined)[] = []
@@ -12,7 +13,7 @@ function core(on: On) {
     seen.push(e.instructions)
     return { messages: [{ role: 'assistant', text: 'SUMMARY', toolUses: [] }] }
   })
-  return { seen, clock: mock.clock(on) }
+  return { seen, clock: mock.clock(on), session: mock.session(on) }
 }
 
 function texts(r: SessionCompactResult): string[] {
@@ -21,10 +22,24 @@ function texts(r: SessionCompactResult): string[] {
 
 test('steers summarizer with brief', async ($, on) => {
   on('model.fork', () => ({ value: { isAnswered: true, text: 'BRIEF', usage } }))
-  const { seen } = core(on)
+  const { seen, clock, session } = core(on)
   const r = await $.session.compact(compaction)
+  await clock.settle()
   expect(seen).toEqual([buildInstructions('focus auth', 'BRIEF')])
-  expect(texts(r)).toEqual(['SUMMARY', briefMessage('BRIEF').text])
+  expect(texts(r)).toEqual(['SUMMARY'])
+  expect(session.appended().map(a => a.message)).toEqual([expect.objectContaining(briefNote('BRIEF'))])
+})
+
+test('skips a short conversation without forking', async ($, on) => {
+  let forked = false
+  on('model.fork', () => {
+    forked = true
+    return { value: { isAnswered: true, text: 'BRIEF', usage } }
+  })
+  const { seen } = core(on)
+  await $.session.compact({ ...compaction, messages: [{ role: 'user', text: 'hi', toolUses: [] }] })
+  expect(forked).toBe(false)
+  expect(seen).toEqual(['focus auth'])
 })
 
 test('falls back when fork is not answered', async ($, on) => {

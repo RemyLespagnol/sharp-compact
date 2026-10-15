@@ -1,3 +1,5 @@
+import type { SessionMessage } from 'claude-code'
+
 export const DEFAULT_BRIEF_PROMPT = `The conversation is about to be compacted. Write a handoff brief that lets you resume this exact work afterwards, as if a colleague had to pick it up cold.
 
 Write it in the conversation's language. Keep verbatim, never rounded or paraphrased: figures, thresholds, timestamps, IDs, file paths, commands, queries, and how to access data or systems.
@@ -11,7 +13,9 @@ Cover, skipping what does not apply:
 - the user's last request and whether it was answered;
 - the next step.
 
-Point to existing artifacts (PRs, files, URLs) by reference instead of copying their content. Always redact secrets, tokens and personal data. At most 600 words. No tools.`
+Point to existing artifacts (PRs, files, URLs) by reference instead of copying their content. Leave out what reloads on its own after compaction: CLAUDE.md, memory files, skills, the system prompt and the user's standing preferences. Always redact secrets, tokens and personal data.
+
+Keep the length proportional to the work actually done: a few lines when little happened, at most 600 words. No tools.`
 
 export type ForkOutcome = { ok: true; text: string } | { ok: false; reason: string }
 
@@ -22,12 +26,24 @@ export function buildInstructions(userText: string | undefined, brief: string): 
   return `${head}Handoff brief written by this session before compaction. Keep its exact details in the summary:\n\n${brief}`
 }
 
-export function briefMessage(brief: string): { role: 'user'; text: string; toolUses: [] } {
+export function briefNote(brief: string): { type: 'user'; content: [{ type: 'text'; text: string }] } {
   return {
-    role: 'user',
-    text: `[sharp-compact] Handoff brief written by this session just before compaction. Treat its exact figures, paths and caveats as authoritative.\n\n${brief}`,
-    toolUses: [],
+    type: 'user',
+    content: [{
+      type: 'text',
+      text: `[sharp-compact] Handoff brief written by this session just before compaction. Use it as the reference for exact figures, paths and caveats.\n\n${brief}`,
+    }],
   }
+}
+
+export function conversationChars(messages: readonly SessionMessage[]): number {
+  let n = 0
+  for (const m of messages) {
+    n += m.text.length
+    for (const u of m.toolUses) n += JSON.stringify(u.input).length + (u.text?.length ?? 0)
+    for (const r of m.toolResults ?? []) n += r.text.length
+  }
+  return n
 }
 
 export async function resolveBrief(

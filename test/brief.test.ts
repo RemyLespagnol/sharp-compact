@@ -1,5 +1,5 @@
 import { test, expect } from 'claude-code/testing'
-import { DEFAULT_BRIEF_PROMPT, briefMessage, buildInstructions, resolveBrief } from '../hooks/brief'
+import { DEFAULT_BRIEF_PROMPT, briefNote, buildInstructions, conversationChars, resolveBrief } from '../hooks/brief'
 
 const never = () => new Promise<never>(() => {})
 const now = () => Promise.resolve()
@@ -15,12 +15,19 @@ test('buildInstructions without user text', () => {
   expect(buildInstructions(undefined, 'B').includes("User's priority")).toBe(false)
 })
 
-test('briefMessage labels the brief', () => {
-  expect(briefMessage('B')).toEqual({
-    role: 'user',
-    text: '[sharp-compact] Handoff brief written by this session just before compaction. Treat its exact figures, paths and caveats as authoritative.\n\nB',
-    toolUses: [],
+test('briefNote labels the brief', () => {
+  expect(briefNote('B')).toEqual({
+    type: 'user',
+    content: [{ type: 'text', text: '[sharp-compact] Handoff brief written by this session just before compaction. Use it as the reference for exact figures, paths and caveats.\n\nB' }],
   })
+})
+
+test('conversationChars counts text, tool inputs and results', () => {
+  expect(conversationChars([
+    { role: 'user', text: 'abc', toolUses: [] },
+    { role: 'assistant', text: 'de', toolUses: [{ tool_use_id: '1', tool: 'Read', input: { file_path: 'x' }, text: 'fghij' }] },
+    { role: 'user', text: '', toolUses: [], toolResults: [{ tool_use_id: '1', text: 'klm', isError: false }] },
+  ])).toBe(3 + 2 + JSON.stringify({ file_path: 'x' }).length + 5 + 3)
 })
 
 test('resolveBrief returns text', async () => {
@@ -40,6 +47,6 @@ test('resolveBrief times out', async () => {
 })
 
 test('DEFAULT_BRIEF_PROMPT covers the spec', () => {
-  for (const s of ["conversation's language", 'verbatim', 'unverified', 'next step', 'by reference', 'redact'])
+  for (const s of ["conversation's language", 'verbatim', 'unverified', 'next step', 'by reference', 'redact', 'proportional', 'CLAUDE.md'])
     expect(DEFAULT_BRIEF_PROMPT.includes(s)).toBe(true)
 })
