@@ -72,3 +72,7 @@ claude --plugin-dir .
 ## License
 
 MIT
+
+## Releasing
+
+Bump `version` in `.claude-plugin/plugin.json` in the PR. When it merges to `main`, the `release` workflow tags `vX.Y.Z` and publishes a GitHub release with notes generated from the merged PRs.
