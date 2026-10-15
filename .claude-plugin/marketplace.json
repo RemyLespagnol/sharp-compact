@@ -1,0 +1,13 @@
+{
+  "name": "sharp-compact",
+  "owner": {
+    "name": "Rémy Lespagnol"
+  },
+  "plugins": [
+    {
+      "name": "sharp-compact",
+      "source": "./"
+    }
+  ],
+  "description": "sharp-compact: every Claude Code compaction keeps what matters."
+}

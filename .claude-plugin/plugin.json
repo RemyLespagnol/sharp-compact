@@ -1,0 +1,23 @@
+{
+  "name": "sharp-compact",
+  "version": "0.1.0",
+  "description": "Every compaction keeps what matters: the session writes its own handoff brief first.",
+  "author": { "name": "Rémy Lespagnol" },
+  "license": "MIT",
+  "userConfig": {
+    "timeoutSeconds": {
+      "type": "number",
+      "title": "Brief timeout (seconds)",
+      "description": "How long to wait for the session's brief before compacting normally.",
+      "default": 90,
+      "min": 10,
+      "max": 600
+    },
+    "briefPrompt": {
+      "type": "string",
+      "title": "Brief prompt",
+      "description": "Replaces the default prompt that asks the session for its handoff brief. Empty uses the default.",
+      "default": ""
+    }
+  }
+}
