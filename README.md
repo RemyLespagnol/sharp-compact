@@ -16,6 +16,12 @@ Short conversations (under ~5k tokens of messages) compact normally: the summary
 
 A toast tells you what happened: `brief kept (N words)`, `short conversation, normal compaction`, or, if anything goes wrong (no conversation to fork yet, an API error, an empty reply, a timeout), `brief skipped (<reason>)`, in which case the compaction runs as it normally would.
 
+Run `/sharp-compact` to read the last brief written in this session.
+
+### Before the cache expires
+
+The prompt cache lasts an hour on subscriptions. Compacting before it expires is cheap; compacting (or simply resuming) after it pays for the whole context again. When a session has sat idle for 55 minutes, sharp-compact sends a desktop notification: `Prompt cache expires soon`. Set `idleCompact` to have it compact, brief included, instead of only warning. Small contexts (under ~5k tokens) are left alone.
+
 ### Before / after
 
 A plain `/compact` on a database migration might keep:
@@ -52,6 +58,8 @@ Set in `/plugin` → sharp-compact → configure, or under `pluginConfigs.sharp-
 |---|---|---|
 | `timeoutSeconds` | `90` | How long to wait for the brief before compacting normally (10–600). |
 | `briefPrompt` | empty | Replaces the default prompt that asks for the brief. Empty uses the default in `hooks/brief.ts`. |
+| `idleMinutes` | `55` | Idle minutes before the cache warning (0–600, `0` turns it off). Use `4` with the API's 5-minute cache. |
+| `idleCompact` | `false` | Compact when the idle time is reached instead of only warning. |
 
 ## Not in v1
 
@@ -60,6 +68,7 @@ Set in `/plugin` → sharp-compact → configure, or under `pluginConfigs.sharp-
 - When auto-compact fires after a "prompt too long" API error, the fork hits the same limit and compaction runs normally.
 - Subagent compactions run normally: the fork only sees the main conversation.
 - If the brief times out, the fork is not cancelled and its tokens are still billed.
+- `/sharp-compact` only remembers briefs written since the plugin last loaded.
 
 ## Development
 
