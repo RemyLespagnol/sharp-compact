@@ -18,6 +18,15 @@ A toast tells you what happened: `brief kept (N words)`, `short conversation, no
 
 Run `/sharp-compact` to read the last brief written in this session.
 
+### Team and Enterprise accounts
+
+On Team and Enterprise accounts, Claude Code's built-in `sec-default` guard skips every user plugin's compaction hook ([its policy](https://github.com/anthropics/claude-code/blob/main/mods/sec-default/README.md)). sharp-compact still writes the brief there through other doors:
+
+- `/compact`: the brief is passed in the command's own arguments.
+- Idle compaction (`idleCompact`) and `compactAtPercent`: sharp-compact asks for the compaction itself.
+
+Claude Code's own auto-compact runs without a brief on those accounts. Set `compactAtPercent` (say `80`) to compact with a brief before it kicks in; a single turn that fills the context past the auto-compact threshold still slips through.
+
 ### Before the cache expires
 
 The prompt cache lasts an hour on subscriptions. Compacting before it expires is cheap; compacting (or simply resuming) after it pays for the whole context again. When a session has sat idle for 55 minutes, sharp-compact sends a desktop notification: `Prompt cache expires soon`. Set `idleCompact` to have it compact, brief included, instead of only warning. Small contexts (under ~5k tokens) are left alone.
@@ -60,6 +69,7 @@ Set in `/plugin` → sharp-compact → configure, or under `pluginConfigs.sharp-
 | `briefPrompt` | empty | Replaces the default prompt that asks for the brief. Empty uses the default in `hooks/brief.ts`. |
 | `idleMinutes` | `55` | Idle minutes before the cache warning (0–600, `0` turns it off). Use `4` with the API's 5-minute cache. |
 | `idleCompact` | `false` | Compact when the idle time is reached instead of only warning. |
+| `compactAtPercent` | `0` | After a turn, compact with a brief once the context is this full (0–100, `0` turns it off). |
 
 ## Not in v1
 
