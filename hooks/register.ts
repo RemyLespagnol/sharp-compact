@@ -5,7 +5,7 @@ import { DEFAULT_BRIEF_PROMPT, briefNote, buildInstructions, conversationChars, 
 const MIN_CHARS = 20_000
 const MIN_TOKENS = 5_000
 
-type Settings = { prompt: string; timeoutMs: number; remember: (brief: string) => void; busy: boolean }
+type Settings = { prompt: string; timeoutMs: number; remember: (brief: string) => void; busy: boolean; pending?: string }
 
 async function briefedCompact<R>(
   $: Engine,
@@ -23,13 +23,18 @@ async function briefedCompact<R>(
   const r = await compact(buildInstructions(instructions, brief.text))
   if (!isCompacted(r)) return r
   s.remember(brief.text)
-  // appended once the compacted transcript is installed, as a row the model reads and the person doesn't see
-  void $.clock.sleep(0).then(async () => {
-    const kept = await $.session.append({ message: briefNote(brief.text) })
-    const words = brief.text.split(/\s+/).length
-    $.ui.toast('deny' in kept ? `sharp-compact: brief not kept (${kept.deny})` : `sharp-compact: brief kept (${words} ${words === 1 ? 'word' : 'words'})`)
-  })
+  s.pending = brief.text
   return r
+}
+
+// a row the model reads and the person doesn't see, appended only once the compacted transcript is installed
+async function appendBrief($: Engine, s: Settings): Promise<void> {
+  const brief = s.pending
+  if (brief === undefined) return
+  s.pending = undefined
+  const kept = await $.session.append({ message: briefNote(brief) })
+  const words = brief.split(/\s+/).length
+  $.ui.toast('deny' in kept ? `sharp-compact: brief not kept (${kept.deny})` : `sharp-compact: brief kept (${words} ${words === 1 ? 'word' : 'words'})`)
 }
 
 const hasMessages = (r: SessionCompactResult) => r.messages !== undefined
@@ -44,8 +49,10 @@ async function exclusive<R>(s: Settings, run: () => Promise<R>): Promise<R> {
 }
 
 // $.session.compact skips this plugin's own session.compact hook, so the brief is written here
-function compactNow($: Engine, s: Settings): Promise<SessionCompactResult> {
-  return exclusive(s, () => briefedCompact($, s, undefined, instructions => $.session.compact({ instructions }), hasMessages))
+async function compactNow($: Engine, s: Settings): Promise<void> {
+  const r = await exclusive(s, () => briefedCompact($, s, undefined, instructions => $.session.compact({ instructions }), hasMessages))
+  // installed by the time $.session.compact resolves
+  if (r.messages) await appendBrief($, s)
 }
 
 async function bigEnough($: Engine): Promise<boolean> {
@@ -86,11 +93,22 @@ export const register: Register = (on, options) => {
   on('command.run', { command: 'compact' }, async ($, e, next) => {
     if (s.busy || !(await bigEnough($))) return next(e)
     idle?.cancel()
-    return exclusive(s, () => briefedCompact($, s, e.args, args => next({ ...e, args: args ?? '' }), () => true))
+    const r = await exclusive(s, () => briefedCompact($, s, e.args, args => next({ ...e, args: args ?? '' }), () => true))
+    await appendBrief($, s)
+    return r
   }).catch(($, e, next) => next(e))
 
+  // an auto-compaction installs its rows after its hook returns: the brief follows the boundary row
+  on('session.append', { door: 'compaction' }, async ($, e, next) => {
+    const r = await next(e)
+    if (!e.agentId && s.pending !== undefined) void $.clock.sleep(0).then(() => appendBrief($, s)).catch(() => {})
+    return r
+  })
+
   on('turn.start', async ($, e, next) => {
-    if (!e.agentId) idle?.cancel()
+    if (e.agentId) return next(e)
+    idle?.cancel()
+    await appendBrief($, s).catch(() => {})
     return next(e)
   })
 

@@ -13,6 +13,7 @@ function core(on: On) {
     toasts.push(e.text)
     return { value: undefined }
   })
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('session.compact', ($, e) => {
     seen.push(e.instructions)
     return { messages: [{ role: 'assistant', text: 'SUMMARY', toolUses: [] }] }
@@ -29,6 +30,9 @@ test('steers summarizer with brief', async ($, on) => {
   const { seen, toasts, clock, session } = core(on)
   const r = await $.session.compact(compaction)
   await clock.settle()
+  // the compacted rows are not installed yet when the hook returns
+  expect(session.appended()).toEqual([])
+  await $.turn.start({ text: 'next', turnId: 't2' })
   expect(toasts[toasts.length - 1]).toBe('sharp-compact: brief kept (1 word)')
   expect(seen).toEqual([buildInstructions('focus auth', 'BRIEF')])
   expect(texts(r)).toEqual(['SUMMARY'])
